@@ -4,6 +4,18 @@ module ActiveRecord
       module DatabaseStatements
         # Executes the SQL statement in the context of this connection and returns
         # the raw result from the connection adapter.
+        # def select_all(arel, name = nil, binds = [], preparable: nil, async: false, allow_retry: false) # :nodoc:
+        #   arel = arel_from_relation(arel)
+        #   puts "binds: #{binds}"
+        #   sql, binds, preparable, allow_retry = to_sql_and_binds(arel, binds, preparable, allow_retry)
+        #   # exec_query(sql, name, binds, prepare: true)
+        #   # if ExplainRegistry.collect? && prepared_statements
+        #   #   unprepared_statement { super }
+        #   # else
+        #   #   super
+        #   # end
+        # end
+
         def execute(sql, name = nil)
           log(sql, name) do
             if HA.instance.api.hanaclient_execute_immediate(@connection, sql) == 0
@@ -16,7 +28,7 @@ module ActiveRecord
         # Executes +sql+ statement in the context of this connection using
         # +binds+ as the bind substitutes. +name+ is logged along with
         # the executed +sql+ statement.
-        def exec_query(sql, name = "SQL", binds = [], prepare: false)
+        def exec_query(sql, name = "SQL", binds = [], prepare: false, allow_retry: allow_retry)
           exec_and_clear(sql, name, binds, prepare: prepare) do |stmt|
             record = []
             columns = []
@@ -39,6 +51,7 @@ module ActiveRecord
             ActiveRecord::Result.new(columns, record)
           end
         end
+        alias :internal_exec_query :exec_query
 
         # Executes the truncate statement.
         def truncate(table_name, name = nil)

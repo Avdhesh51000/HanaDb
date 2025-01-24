@@ -13,6 +13,7 @@ require "active_record/connection_adapters/hanaclient/schema_definitions"
 require "active_record/connection_adapters/hanaclient/schema_statements"
 require "active_record/connection_adapters/hanaclient/transaction"
 require "active_record/connection_adapters/hanaclient/type_metadata"
+require "active_record/connection_adapters/hanaclient/utils"
 
 require "hanaclient"
 # Singleton class to hold a valid instance of the HANACLIENTInterface across all connections
@@ -62,6 +63,8 @@ module ActiveRecord
 
   module ConnectionAdapters
 
+    ActiveRecord::ConnectionAdapters.register("hanaclient", "ActiveRecord::ConnectionAdapters::HanaclientAdapter", "active_record/connection_adapters/hanaclient_adapter")
+
     class HanaclientAdapter < AbstractAdapter
       ADAPTER_NAME = "Hanaclient".freeze
 
@@ -102,11 +105,20 @@ module ActiveRecord
         Arel::Visitors::Hanaclient.new(self)
       end
 
-      def initialize( connection, logger, connection_string, config) #:nodoc:
+      def initialize(config) #:nodoc:
+        connection = HA.instance.api.hanaclient_new_connection()
+        logger = ActiveSupport::Logger
+        connection_string = "SERVERNODE=#{config[:server]}"
+        connection_string += ":#{config[:port]}" if config[:port]
+        connection_string += ";UID=#{config[:username]};PWD=#{config[:password]};"
+        connection_string += "DATABASENAME=#{config[:database]};" if config[:database]
+        # overrides the database option in connection properties if the database option is explicity given
+        connection_string += (config[:database] ? config[:connection_properties].gsub(/databasename=[^;]*;/i, "") : config[:connection_properties]) if config[:connection_properties]
+
         super(connection, logger, config)
 
         @statements = StatementPool.new(self.class.type_cast_config_to_integer(config[:statement_limit]))
-
+        @connection = connection
         @connection_string = connection_string
 
         @affected_rows = 0
